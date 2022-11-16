@@ -122,16 +122,18 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/message", async (res, req) => {
+router.get("/message", async (req, res) => {
   const tokenHeaderKey = process.env.TOKEN_HEADER_KEY; //user's token from the env variable
   const token = req.header(tokenHeaderKey); //user's token from the request headers
+  console.log(tokenHeaderKey)
 
   const jwtSecretKey = process.env.JWT_SECRET_KEY;
   const verifiedToken = jwt.verify(token, jwtSecretKey);
-  console.log(verified);
+  console.log(jwtSecretKey);
+  console.log(verifiedToken);
 
-  const userData = verified.userData;
-  
+  const userData = verifiedToken.userData;
+
   if (!verifiedToken) {
     res.json({
       success: false,
