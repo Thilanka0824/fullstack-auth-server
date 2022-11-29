@@ -7,9 +7,9 @@ const { v4 } = require("uuid");
 const { db } = require("../mongo");
 
 /* GET users listing. */
-router.get("/", (req, res, next) => {
-  res.send("respond with a resource");
-});
+// router.get("/", (req, res, next) => {
+//   res.send("respond with a resource");
+// });
 
 router.get("/all", async (req, res, next) => {
   try {
@@ -30,22 +30,30 @@ router.get("/all", async (req, res, next) => {
 
 router.post("/register", async (req, res) => {
   try {
+    const username = req.body.username;
     const email = req.body.email;
     const password = req.body.password;
+    
 
     // generating a new salt with the bcrypt genSalt function
-    const saltRounds = 1;
+    const saltRounds = 5;
     const salt = await bcrypt.genSalt(saltRounds);
     const passwordHash = await bcrypt.hash(password, salt);
     //generating a hashed password using the bcrypt hash function
 
     const user = {
+      
+      username: username,
       email: email,
       password: passwordHash,
       id: v4(),
+      // isLoggedIn: false,
+      creationDate: new Date(),
+      lastModified: new Date(),
     }; //creating a user in the db
 
     const addUser = await db().collection("users").insertOne(user);
+    console.log(user);
     console.log(addUser);
 
     res.json({
@@ -68,13 +76,14 @@ router.post("/login", async (req, res) => {
     const user = await db().collection("users").findOne({
       email: email,
     });
-
+    console.log(user)
+    console.log(req.body)
     //if a user with this email address was not found in the database, the route should respond with a success: false object
     if (!user) {
       res
         .json({
           success: false,
-          message: "Could not find user.",
+          message: "Could not find user",
         })
         .status(204);
       return;
@@ -102,6 +111,7 @@ router.post("/login", async (req, res) => {
       userId: user.id,
       scope: userType,
     };
+    console.log(userData)
 
     const exp = Math.floor(Date.now() / 1000) + 60 * 60; //numerical value in seconds of 24 hours
     const payload = {
@@ -113,7 +123,7 @@ router.post("/login", async (req, res) => {
     const jwtSecretKey = process.env.JWT_SECRET_KEY;
     const token = jwt.sign(payload, jwtSecretKey);
 
-    res.json({ success: true, token: token, email: email });
+    res.json({ success: true, token: token, email: email, username: user.username });
   } catch (err) {
     res.json({
       success: false,
@@ -123,34 +133,43 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/message", async (req, res) => {
-  const tokenHeaderKey = process.env.TOKEN_HEADER_KEY; //user's token from the env variable
-  const token = req.header(tokenHeaderKey); //user's token from the request headers
-  console.log(tokenHeaderKey)
+  try {
+    const tokenHeaderKey = process.env.TOKEN_HEADER_KEY; //user's token from the env variable
+    const token = req.header(tokenHeaderKey); //user's token from the request headers
+    console.log(tokenHeaderKey);
 
-  const jwtSecretKey = process.env.JWT_SECRET_KEY;
-  const verifiedToken = jwt.verify(token, jwtSecretKey);
-  console.log(jwtSecretKey);
-  console.log(verifiedToken);
+    const jwtSecretKey = process.env.JWT_SECRET_KEY;
+    const verifiedToken = jwt.verify(token, jwtSecretKey);
+    console.log(jwtSecretKey);
+    console.log(verifiedToken);
 
-  const userData = verifiedToken.userData;
+    const userData = verifiedToken.userData;
 
-  if (!verifiedToken) {
+    // if (!verifiedToken) {
+    //   res.json({
+    //     success: false,
+    //     message: "ID Token could not be verified",
+    //   });
+    // }
+    if (userData && userData.scope === "user") {
+      return res.json({
+        success: true,
+        message: "I am a normal user",
+      });
+    }
+
+    if (userData && userData.scope === "admin") {
+      return res.json({
+        success: true,
+        message: "I am an admin user",
+      });
+    }
+
+    throw Error("Access Denied");
+  } catch (err) {
     res.json({
       success: false,
-      message: "ID Token could not be verified",
-    });
-  }
-  if (userData && userData.scope === "user") {
-    return res.json({
-      success: true,
-      message: "I am a normal user",
-    });
-  }
-
-  if (userData && userData.scope === "admin") {
-    return res.json({
-      success: true,
-      message: "I am an admin user",
+      error: err.toString(),
     });
   }
 });
